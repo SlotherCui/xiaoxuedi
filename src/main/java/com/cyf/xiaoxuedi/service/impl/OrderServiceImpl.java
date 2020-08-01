@@ -53,7 +53,7 @@ public class OrderServiceImpl implements OrderService {
     MissionService missionService;
 
     /**
-     * 抢任务的较强一致性方案
+     * 抢任务的较强一致性方案 // 如果事务执行失败，需要外部try catch还原Redis    // 因为缓存中判断任务是否被抢的标记的过期时间比Mission_更长
      * @param missionId
      * @param userId
      * @return
@@ -63,22 +63,17 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderModel acceptMission(Integer missionId, Integer userId) throws BuinessException {
 
-
-        // 0. 在缓存中判断该任务是否被抢
-        Boolean missionStatus = redisTemplate.opsForValue().setIfAbsent("Mission_status_"+missionId, 1, 1,TimeUnit.DAYS);
-        if(missionStatus){
-
-        }else{
-            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
-        }
-
-
         //1. 查询Mission_id 验证是否存在
         //MissionDO missionDO = missionDOMapper.selectByPrimaryKey(missionId);
         // 查缓存
         MissionDO missionDO = missionService.getMissionDOByIdInCache(missionId);
         if(missionDO==null){
             throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+        }
+
+        // 1.5 判断该任务是否已被抢， 防止当缓存中任务被抢的标志位过期后的更改。
+        if(missionDO.getStatus()!=0){
+            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
         }
 
 
@@ -131,6 +126,19 @@ public class OrderServiceImpl implements OrderService {
         return orderModel;
     }
 
+    /**
+     * 抢任务的较保证响应速度的实现方式，采用异步更新Mission状态
+     * @param missionId
+     * @param userId
+     * @return
+     * @throws BuinessException
+     */
+    @Override
+    public OrderModel acceptMissionFaster(Integer missionId, Integer userId) throws BuinessException {
+        return null;
+    }
+
+
     @Override
     @Transactional
     public void finishOrder(String orderId, Integer userId) throws BuinessException {
@@ -164,6 +172,9 @@ public class OrderServiceImpl implements OrderService {
         // 3.更改Mission的状态
         missionDO.setStatus((byte) 2);
         missionDOMapper.updateByPrimaryKeySelective(missionDO);
+
+        // 3.1 删除Redis中Mission
+        redisTemplate.delete("Mission_"+missionDO.getId());
 
     }
 

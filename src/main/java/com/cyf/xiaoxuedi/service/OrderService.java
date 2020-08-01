@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface OrderService {
     OrderModel acceptMission(Integer missionId, Integer userId) throws BuinessException;
+    OrderModel acceptMissionFaster(Integer missionId, Integer userId) throws BuinessException;
     void finishOrder(String orderId, Integer userId) throws BuinessException;
     List<OrderModel> getCurrentOrderList(Integer userId, Integer type , Integer page) throws BuinessException;
 }

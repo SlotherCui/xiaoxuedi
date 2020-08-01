@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 public class OrderController extends BaseController {
@@ -39,7 +40,29 @@ public class OrderController extends BaseController {
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
-        OrderModel orderModel = orderService.acceptMission(id, userModel.getId());
+
+        OrderModel orderModel = null;
+
+        // 如果执行失败则执行方法
+
+        // 0. 在缓存中判断该任务是否被抢
+        Boolean missionStatus = redisTemplate.opsForValue().setIfAbsent("Mission_status_"+id, 1, 1, TimeUnit.DAYS);
+
+        if(missionStatus){
+
+            try{
+                orderModel = orderService.acceptMission(id, userModel.getId());
+            }catch (Exception e){
+                // 事务回滚则回复缓存中的标志
+                redisTemplate.delete("Mission_status_"+id);
+
+            }
+
+        }else{
+            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
+        }
+
+
 
         return CommonReturnType.create(orderModel);
     }
