@@ -1,5 +1,6 @@
 package com.cyf.xiaoxuedi.service;
 
+import com.cyf.xiaoxuedi.DO.MissionDO;
 import com.cyf.xiaoxuedi.error.BuinessException;
 import com.cyf.xiaoxuedi.service.model.MissionItemModel;
 import com.cyf.xiaoxuedi.service.model.MissionModel;
@@ -14,4 +15,5 @@ public interface MissionService {
     List<MissionItemModel> getMyMissionList(Integer status,Integer page, Integer userId)throws BuinessException;
     List<MissionItemModel>getMyAcceptedMissionList(Integer status,Integer page, Integer userId)throws BuinessException;
     OrderModel getMyMission(Integer id, Integer userId)throws BuinessException;
+    MissionDO getMissionDOByIdInCache(Integer id);
 }

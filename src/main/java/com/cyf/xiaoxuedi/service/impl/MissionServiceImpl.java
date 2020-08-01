@@ -9,6 +9,7 @@ import com.cyf.xiaoxuedi.DO.UserDO;
 import com.cyf.xiaoxuedi.error.BuinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.service.MissionService;
+import com.cyf.xiaoxuedi.service.UserService;
 import com.cyf.xiaoxuedi.service.model.MissionItemModel;
 import com.cyf.xiaoxuedi.service.model.MissionModel;
 import com.cyf.xiaoxuedi.service.model.OrderModel;
@@ -42,6 +43,12 @@ public class MissionServiceImpl implements MissionService {
     @Autowired
     OrderDOMapper orderDOMapper;
 
+    @Autowired
+    UserService userService;
+
+    @Autowired
+    MissionService missionService;
+
     /**
      *  发布任务
      * @param missionModel
@@ -67,9 +74,9 @@ public class MissionServiceImpl implements MissionService {
         missionDOMapper.insertSelective(missionDO);
 
 
-        //缓存起来
-//        redisTemplate.opsForValue().set("mission_"+missionDO.getId(), missionModel);
-//        redisTemplate.expire("mission_"+missionDO.getId(), 30, TimeUnit.MINUTES);
+//        缓存起来
+        redisTemplate.opsForValue().set("Mission_"+missionDO.getId(), missionDO);
+        redisTemplate.expire("Mission_"+missionDO.getId(), 30, TimeUnit.MINUTES);
 
     }
 
@@ -96,23 +103,16 @@ public class MissionServiceImpl implements MissionService {
     public MissionModel getMissionByID(Integer id) throws BuinessException {
 
         // 查询MissionDO
-        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(id);
+//        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(id);
+        MissionDO missionDO = missionService.getMissionDOByIdInCache(id);
         if(missionDO==null){
             throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
         // 查询该Mission的发布人
-
-//        UserDO userDO = userDOMapper.selectByPrimaryKey(missionDO.getUserId());
-        UserDO userDO = (UserDO) redisTemplate.opsForValue().get("User_"+missionDO.getUserId());
+        UserDO userDO = userService.getUserDOByIdInCache(missionDO.getUserId());
         if(userDO==null){
-            System.out.println("here");
-            userDO = userDOMapper.selectByPrimaryKey(missionDO.getUserId());
-            if(userDO==null){
-                throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
-            }
-            redisTemplate.opsForValue().set("User_"+missionDO.getUserId(), userDO);
-            redisTemplate.expire("User_"+missionDO.getUserId(), 10,TimeUnit.MINUTES);
+            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
         }
 
 
@@ -165,18 +165,16 @@ public class MissionServiceImpl implements MissionService {
         List<MissionItemModel> missionItemModelList = missionDOList.stream().map(orderDO -> {
             MissionItemModel missionItemModel = new MissionItemModel();
             // 获得任务
-            MissionDO missionDO = missionDOMapper.selectByPrimaryKey(orderDO.getMissionId());
+            MissionDO missionDO = missionService.getMissionDOByIdInCache(orderDO.getMissionId());
+//            MissionDO missionDO = missionDOMapper.selectByPrimaryKey(orderDO.getMissionId());
 
             BeanUtils.copyProperties(missionDO, missionItemModel);
 
 
             // 获得发布人姓名 并将UserDO缓存到Redis中
-            UserDO userDO = (UserDO) redisTemplate.opsForValue().get("User_"+missionDO.getUserId());
-            if(userDO==null){
-                userDO = userDOMapper.selectByPrimaryKey(missionDO.getUserId());
-                redisTemplate.opsForValue().set("User_"+missionDO.getUserId(), userDO);
-                redisTemplate.expire("User_"+missionDO.getUserId(), 10,TimeUnit.MINUTES);
-            }
+            UserDO userDO = userService.getUserDOByIdInCache(missionDO.getUserId());
+
+
             missionItemModel.setOrderId(orderDO.getId());
             missionItemModel.setUserName(userDO==null?"":userDO.getName());
             return missionItemModel;
@@ -209,40 +207,40 @@ public class MissionServiceImpl implements MissionService {
         BeanUtils.copyProperties(orderDO, orderModel);
 
         // 获得发布人信息
-        UserDO userDO = (UserDO) redisTemplate.opsForValue().get("User_"+orderDO.getUserId());
+        UserDO userDO = userService.getUserDOByIdInCache(orderDO.getUserId());
         if(userDO==null){
-            userDO = userDOMapper.selectByPrimaryKey(orderDO.getUserId());
-            if(userDO==null){
-                throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
-            }
-            redisTemplate.opsForValue().set("User_"+orderDO.getUserId(), userDO);
-            redisTemplate.expire("User_"+orderDO.getUserId(), 10,TimeUnit.MINUTES);
+            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
         }
-
         orderModel.setUserDO(userDO);
 
 
         // 获得接受人信息
-        UserDO AccepterDO = (UserDO) redisTemplate.opsForValue().get("User_"+orderDO.getAccepterId());
+        UserDO AccepterDO = userService.getUserDOByIdInCache(orderDO.getAccepterId());
         if(AccepterDO==null){
-            AccepterDO = userDOMapper.selectByPrimaryKey(orderDO.getAccepterId());
-            if(AccepterDO==null){
-                throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
-            }
-            redisTemplate.opsForValue().set("User_"+orderDO.getAccepterId(), AccepterDO);
-            redisTemplate.expire("User_"+orderDO.getAccepterId(), 10,TimeUnit.MINUTES);
+            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
         }
-
         orderModel.setAccepterDO(AccepterDO);
 
 
         // 获得任务信息
-        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(orderDO.getMissionId());
+        MissionDO missionDO = missionService.getMissionDOByIdInCache(orderDO.getMissionId());
+//        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(orderDO.getMissionId());
         orderModel.setMissionDO(missionDO);
 
 
-
         return orderModel;
+    }
+
+    @Override
+    public MissionDO getMissionDOByIdInCache(Integer id) {
+
+        MissionDO missionDO = (MissionDO) redisTemplate.opsForValue().get("Mission_"+id);
+        if(missionDO==null){
+            missionDO = missionDOMapper.selectByPrimaryKey(id);
+            redisTemplate.opsForValue().set("Mission_"+id, missionDO);
+            redisTemplate.expire("Mission_"+id, 30, TimeUnit.MINUTES);
+        }
+        return missionDO;
     }
 
     private List<MissionItemModel> convertFromMissionDOList(List<MissionDO>missionDOList){
@@ -254,12 +252,7 @@ public class MissionServiceImpl implements MissionService {
             BeanUtils.copyProperties(missionDO, missionItemModel);
 
             // 获得发布人姓名 并将UserDO缓存到Redis中
-            UserDO userDO = (UserDO) redisTemplate.opsForValue().get("User_"+missionDO.getUserId());
-            if(userDO==null){
-                userDO = userDOMapper.selectByPrimaryKey(missionDO.getUserId());
-                redisTemplate.opsForValue().set("User_"+missionDO.getUserId(), userDO);
-                redisTemplate.expire("User_"+missionDO.getUserId(), 10,TimeUnit.MINUTES);
-            }
+            UserDO userDO = userService.getUserDOByIdInCache(missionDO.getUserId());
 
             missionItemModel.setUserName(userDO==null?"":userDO.getName());
             return missionItemModel;

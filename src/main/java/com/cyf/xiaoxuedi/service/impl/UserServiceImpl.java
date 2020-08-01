@@ -15,11 +15,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.UnsupportedEncodingException;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -32,6 +34,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     UserPasswordDOMapper userPasswordDOMapper;
+
+    @Autowired
+    RedisTemplate redisTemplate;
 
     @Override
     @Transactional
@@ -122,5 +127,20 @@ public class UserServiceImpl implements UserService {
         }
 
         return userModel;
+    }
+
+    @Override
+    public UserDO getUserDOByIdInCache(Integer id) {
+
+        UserDO userDO = (UserDO) redisTemplate.opsForValue().get("User_"+id);
+        if(userDO==null){
+            userDO = userDOMapper.selectByPrimaryKey(id);
+//            if(userDO==null){
+//                throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+//            }
+            redisTemplate.opsForValue().set("User_"+id, userDO);
+            redisTemplate.expire("User_"+id, 30, TimeUnit.MINUTES);
+        }
+        return userDO;
     }
 }

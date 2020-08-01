@@ -10,7 +10,9 @@ import com.cyf.xiaoxuedi.DO.SequenceDO;
 import com.cyf.xiaoxuedi.DO.UserDO;
 import com.cyf.xiaoxuedi.error.BuinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
+import com.cyf.xiaoxuedi.service.MissionService;
 import com.cyf.xiaoxuedi.service.OrderService;
+import com.cyf.xiaoxuedi.service.UserService;
 import com.cyf.xiaoxuedi.service.model.MissionItemModel;
 import com.cyf.xiaoxuedi.service.model.OrderModel;
 import org.springframework.beans.BeanUtils;
@@ -44,23 +46,50 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     RedisTemplate redisTemplate;
 
+    @Autowired
+    UserService userService;
+
+    @Autowired
+    MissionService missionService;
+
+    /**
+     * 抢任务的较强一致性方案
+     * @param missionId
+     * @param userId
+     * @return
+     * @throws BuinessException
+     */
     @Override
     @Transactional
     public OrderModel acceptMission(Integer missionId, Integer userId) throws BuinessException {
+
+
+        // 0. 在缓存中判断该任务是否被抢
+        Boolean missionStatus = redisTemplate.opsForValue().setIfAbsent("Mission_status_"+missionId, 1, 1,TimeUnit.DAYS);
+        if(missionStatus){
+
+        }else{
+            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
+        }
+
+
         //1. 查询Mission_id 验证是否存在
-        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(missionId);
+        //MissionDO missionDO = missionDOMapper.selectByPrimaryKey(missionId);
+        // 查缓存
+        MissionDO missionDO = missionService.getMissionDOByIdInCache(missionId);
         if(missionDO==null){
             throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
 
-        //2. 查询User_id 验证是否存在
-        UserDO publisher =userDOMapper.selectByPrimaryKey(missionDO.getUserId());
+
+        //2. 查询发起者，接收者 验证是否存在
+        UserDO publisher = userService.getUserDOByIdInCache(missionDO.getUserId());
         if(publisher==null){
             throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
         }
 
-        UserDO accepter = userDOMapper.selectByPrimaryKey(userId);
+        UserDO accepter = userService.getUserDOByIdInCache(userId);
         if(accepter==null){
             throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
         }
@@ -69,13 +98,6 @@ public class OrderServiceImpl implements OrderService {
         if(publisher.getId()==accepter.getId()){
             throw new BuinessException(EmBusinessError.MISSION_BY_YOURSELF);
         }
-
-
-        // 3. 验证任务是否被抢
-        if(missionDO.getStatus()!=0){
-            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
-        }
-
 
         //4. 订单入库
         OrderModel orderModel = new OrderModel();
@@ -97,12 +119,15 @@ public class OrderServiceImpl implements OrderService {
         BeanUtils.copyProperties(orderModel, orderDO);
         orderDOMapper.insertSelective(orderDO);
 
+
         //5. 改变商品状态
         missionDO.setStatus((byte) 1);
         missionDOMapper.updateByPrimaryKey(missionDO);
 
-        //6. 返回前端
+        //6. 删缓存
+        redisTemplate.delete("Mission_"+missionId);
 
+        //7. 返回前端
         return orderModel;
     }
 
@@ -115,10 +140,21 @@ public class OrderServiceImpl implements OrderService {
             throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
+        // 1.1 不能结束掉别人的任务
+        if(orderDO.getUserId() != userId){
+            throw new BuinessException(EmBusinessError.UNKNOWN_ERROR,"无权访问");
+        }
 
-        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(orderDO.getMissionId());
+
+        // 1.2 验证任务存在
+        MissionDO missionDO = missionService.getMissionDOByIdInCache(orderDO.getMissionId());
         if(missionDO==null){
             throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+        }
+
+        // 1.3 正在进行中的任务才能结束
+        if(orderDO.getStatus()!=0){
+            throw new BuinessException(EmBusinessError.UNKNOWN_ERROR,"已经结束了");
         }
 
         // 2. 更改订单状态
@@ -154,29 +190,20 @@ public class OrderServiceImpl implements OrderService {
             throw new BuinessException(EmBusinessError.UNKNOWN_ERROR,"检索状态异常");
         }
 
+
         List<OrderModel> orderModels = list.stream().map(orderDO -> {
             OrderModel orderModel = new OrderModel();
             BeanUtils.copyProperties(orderDO,orderModel);
 
             // 获得发布人, 接收人姓名 并将UserDO缓存到Redis中
-            UserDO userDO = (UserDO) redisTemplate.opsForValue().get("User_"+orderDO.getUserId());
-            if(userDO==null){
-                userDO = userDOMapper.selectByPrimaryKey(orderDO.getUserId());
-                redisTemplate.opsForValue().set("User_"+orderDO.getUserId(), userDO);
-                redisTemplate.expire("User_"+orderDO.getUserId(), 10, TimeUnit.MINUTES);
-            }
+            UserDO userDO = userService.getUserDOByIdInCache(orderDO.getUserId());
             orderModel.setUserDO(userDO);
 
-            UserDO accepterDO = (UserDO) redisTemplate.opsForValue().get("User_"+orderDO.getAccepterId());
-            if(accepterDO==null){
-                accepterDO = userDOMapper.selectByPrimaryKey(orderDO.getAccepterId());
-                redisTemplate.opsForValue().set("User_"+orderDO.getAccepterId(), accepterDO);
-                redisTemplate.expire("User_"+orderDO.getAccepterId(), 10, TimeUnit.MINUTES);
-            }
+            UserDO accepterDO = userService.getUserDOByIdInCache(orderDO.getAccepterId());
             orderModel.setAccepterDO(accepterDO);
 
-            // 获得任务
-            MissionDO missionDO = missionDOMapper.selectByPrimaryKey(orderDO.getMissionId());
+            // 获得任务 通过Cache
+            MissionDO missionDO = missionService.getMissionDOByIdInCache(orderDO.getMissionId());
             orderModel.setMissionDO(missionDO);
 
             return orderModel;
