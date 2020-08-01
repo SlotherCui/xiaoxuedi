@@ -16,7 +16,8 @@ public enum EmBusinessError implements CommonError{
 
     //30000开头为交易信息错误
     MISSION_NOT_EXIT(30001, "任务不存在"),
-
+    MISSION_HAS_GONE(30002,"任务已被抢了"),
+    MISSION_BY_YOURSELF(30003,"不能抢自己的任务")
     ;
 
     private EmBusinessError(int errCode, String errMsg) {

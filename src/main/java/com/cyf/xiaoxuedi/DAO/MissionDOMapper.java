@@ -55,4 +55,8 @@ public interface MissionDOMapper {
 
 
     List<MissionDO> selectMissionBySchool(String school, Integer page);
+
+    List<MissionDO> selectMyMissionByStatus(Integer userId, Byte status, Integer offset);
+
+
 }

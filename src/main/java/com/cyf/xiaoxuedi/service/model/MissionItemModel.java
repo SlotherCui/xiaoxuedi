@@ -21,4 +21,6 @@ public class MissionItemModel {
     private BigDecimal price;
 
     private Date createTime;
+
+    private String orderId;
 }
