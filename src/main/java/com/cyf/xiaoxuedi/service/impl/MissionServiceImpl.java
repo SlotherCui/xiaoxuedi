@@ -6,7 +6,7 @@ import com.cyf.xiaoxuedi.DAO.UserDOMapper;
 import com.cyf.xiaoxuedi.DO.MissionDO;
 import com.cyf.xiaoxuedi.DO.OrderDO;
 import com.cyf.xiaoxuedi.DO.UserDO;
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.service.MissionService;
 import com.cyf.xiaoxuedi.service.UserService;
@@ -15,7 +15,6 @@ import com.cyf.xiaoxuedi.service.model.MissionModel;
 import com.cyf.xiaoxuedi.service.model.OrderModel;
 import com.cyf.xiaoxuedi.validator.ValidationResult;
 import com.cyf.xiaoxuedi.validator.ValidatorImpl;
-import org.apache.ibatis.annotations.Select;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -52,20 +51,20 @@ public class MissionServiceImpl implements MissionService {
     /**
      *  发布任务
      * @param missionModel
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @Override
-    public void publishMission(MissionModel missionModel) throws BuinessException {
+    public void publishMission(MissionModel missionModel) throws BusinessException {
 
         // 判空
         if(missionModel==null){
-            throw new BuinessException(EmBusinessError.UNKNOWN_ERROR);
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR);
         }
 
         // 校验参数
         ValidationResult validationResult = validator.validate(missionModel);
         if(validationResult.isHasErrors()){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, validationResult.getErrMsg());
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, validationResult.getErrMsg());
         }
 
         //持久化保存到数据库中
@@ -75,17 +74,17 @@ public class MissionServiceImpl implements MissionService {
 
 
 //        缓存起来
-        redisTemplate.opsForValue().set("Mission_"+missionDO.getId(), missionDO);
-        redisTemplate.expire("Mission_"+missionDO.getId(), 30, TimeUnit.MINUTES);
+//        redisTemplate.opsForValue().set("Mission_"+missionDO.getId(), missionDO);
+//        redisTemplate.expire("Mission_"+missionDO.getId(), 30, TimeUnit.MINUTES);
 
     }
 
     @Override
-    public List<MissionItemModel> getMissionList(String school, Integer page) throws BuinessException {
+    public List<MissionItemModel> getMissionList(String school, Integer page) throws BusinessException {
 
         // 验证入参
         if(page<0){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
         }
 
         // 获得分页偏移量
@@ -100,19 +99,19 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public MissionModel getMissionByID(Integer id) throws BuinessException {
+    public MissionModel getMissionByID(Integer id) throws BusinessException {
 
         // 查询MissionDO
 //        MissionDO missionDO = missionDOMapper.selectByPrimaryKey(id);
         MissionDO missionDO = missionService.getMissionDOByIdInCache(id);
         if(missionDO==null){
-            throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
         // 查询该Mission的发布人
         UserDO userDO = userService.getUserDOByIdInCache(missionDO.getUserId());
         if(userDO==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
         }
 
 
@@ -125,11 +124,11 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public List<MissionItemModel> getMyMissionList(Integer status, Integer page, Integer userId) throws BuinessException {
+    public List<MissionItemModel> getMyMissionList(Integer status, Integer page, Integer userId) throws BusinessException {
 
         // 验证入参
         if(page<0){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
         }
 
         // 获得分页偏移量
@@ -148,11 +147,11 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public List<MissionItemModel> getMyAcceptedMissionList(Integer status, Integer page, Integer userId) throws BuinessException {
+    public List<MissionItemModel> getMyAcceptedMissionList(Integer status, Integer page, Integer userId) throws BusinessException {
 
         // 验证入参
         if(page<0){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
         }
 
         // 获得分页偏移量
@@ -188,7 +187,7 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
-    public OrderModel getMyMission(Integer id, Integer userId) throws BuinessException {
+    public OrderModel getMyMission(Integer id, Integer userId) throws BusinessException {
 
         OrderDO orderDO = orderDOMapper.selectByMissionId(id);
 
@@ -196,11 +195,11 @@ public class MissionServiceImpl implements MissionService {
 
         // 还未生成订单，无人接单情况
         if(orderDO==null){
-            throw  new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+            throw  new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
         if(orderDO.getUserId()!=userId&&orderDO.getAccepterId()!=userId){
-            throw  new BuinessException(EmBusinessError.UNKNOWN_ERROR, "无权限访问");
+            throw  new BusinessException(EmBusinessError.UNKNOWN_ERROR, "无权限访问");
         }
 
 
@@ -209,7 +208,7 @@ public class MissionServiceImpl implements MissionService {
         // 获得发布人信息
         UserDO userDO = userService.getUserDOByIdInCache(orderDO.getUserId());
         if(userDO==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
         }
         orderModel.setUserDO(userDO);
 
@@ -217,7 +216,7 @@ public class MissionServiceImpl implements MissionService {
         // 获得接受人信息
         UserDO AccepterDO = userService.getUserDOByIdInCache(orderDO.getAccepterId());
         if(AccepterDO==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
         }
         orderModel.setAccepterDO(AccepterDO);
 

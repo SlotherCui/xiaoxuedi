@@ -2,7 +2,7 @@ package com.cyf.xiaoxuedi.controller;
 
 
 import com.alibaba.druid.util.StringUtils;
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.response.CommonReturnType;
 import com.cyf.xiaoxuedi.service.model.UserModel;
@@ -30,8 +30,8 @@ public class BaseController {
     @ResponseBody
     public Object handlerException(HttpServletRequest request, Exception ex) {
         Map<String, Object> responseData = new HashMap<>();
-        if (ex instanceof BuinessException) {
-            BuinessException buinessException = (BuinessException) ex;
+        if (ex instanceof BusinessException) {
+            BusinessException buinessException = (BusinessException) ex;
             return CommonReturnType.create("", String.valueOf(buinessException.getErrorCode()),buinessException.getErrorMsg());
         } else {
             ex.printStackTrace();
@@ -41,15 +41,15 @@ public class BaseController {
     }
 
 
-    public UserModel isLogin(String token) throws BuinessException {
+    public UserModel isLogin(String token) throws BusinessException {
 
         if(StringUtils.isEmpty(token)){
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         }
 
         UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
         if(userModel==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         }
 
         return userModel;

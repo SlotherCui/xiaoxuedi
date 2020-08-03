@@ -1,26 +1,18 @@
 package com.cyf.xiaoxuedi.controller;
 
 import com.alibaba.druid.util.StringUtils;
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.response.CommonReturnType;
 import com.cyf.xiaoxuedi.service.UserService;
 import com.cyf.xiaoxuedi.service.model.UserModel;
 import com.cyf.xiaoxuedi.utils.EncrptUtils;
-import com.cyf.xiaoxuedi.validator.ValidationResult;
-import com.cyf.xiaoxuedi.validator.ValidatorImpl;
-import com.sun.javaws.exceptions.BadMimeTypeResponseException;
-import org.apache.tomcat.util.security.MD5Encoder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
-import sun.misc.BASE64Encoder;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.LinkedHashMap;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -42,7 +34,7 @@ public class UserController extends BaseController{
      * @param telephone
      * @param password
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      * @throws UnsupportedEncodingException
      * @throws NoSuchAlgorithmException
      */
@@ -51,7 +43,7 @@ public class UserController extends BaseController{
                                      @RequestParam("gender") Byte gender,
                                      @RequestParam("school") String school,
                                      @RequestParam("telephone") String telephone,
-                                     @RequestParam("password") String password) throws BuinessException, UnsupportedEncodingException, NoSuchAlgorithmException {
+                                     @RequestParam("password") String password) throws BusinessException, UnsupportedEncodingException, NoSuchAlgorithmException {
 
         //创建UserModel
         UserModel userModel = new UserModel();
@@ -64,6 +56,8 @@ public class UserController extends BaseController{
         //交给Service层完成注册
         userService.register(userModel);
 
+
+
         return CommonReturnType.create("");
     }
 
@@ -72,14 +66,14 @@ public class UserController extends BaseController{
      * @param telephone
      * @param password
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @PostMapping("/login")
     public CommonReturnType Login(@RequestParam("telephone") String telephone,
-                                  @RequestParam("password") String password) throws BuinessException, UnsupportedEncodingException, NoSuchAlgorithmException {
+                                  @RequestParam("password") String password) throws BusinessException, UnsupportedEncodingException, NoSuchAlgorithmException {
 
         if(password==null){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"密码或电话号码错误");
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"密码或电话号码错误");
         }
 
 
@@ -100,10 +94,10 @@ public class UserController extends BaseController{
     /**
      * 获取用户model
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @GetMapping("getUser")
-    public CommonReturnType GetUser() throws BuinessException {
+    public CommonReturnType GetUser() throws BusinessException {
 
         // 获取token
         String token = httpServletRequest.getParameterMap().get("token")[0];
@@ -111,12 +105,14 @@ public class UserController extends BaseController{
         // 验证是否登录
         UserModel userModel = (UserModel) redisTemplate.opsForValue().get(token);
         if(StringUtils.isEmpty(token)){
-            throw  new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw  new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         }
 
         if(userModel==null){
-            throw  new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw  new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         }
+
+
 
         return CommonReturnType.create(userModel);
     }

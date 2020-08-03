@@ -1,6 +1,6 @@
 package com.cyf.xiaoxuedi.controller;
 
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.response.CommonReturnType;
 import com.cyf.xiaoxuedi.service.OrderService;
@@ -29,14 +29,14 @@ public class OrderController extends BaseController {
      * 抢任务
      * @param id
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @PostMapping(value = "/acceptMission", consumes = CONTENT_TYPE_FORMED)
-    public CommonReturnType AcceptMission(@RequestParam("id") Integer id) throws BuinessException {
+    public CommonReturnType AcceptMission(@RequestParam("id") Integer id) throws BusinessException {
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
@@ -55,11 +55,11 @@ public class OrderController extends BaseController {
             }catch (Exception e){
                 // 事务回滚则回复缓存中的标志
                 redisTemplate.delete("Mission_status_"+id);
-
+                throw e;
             }
 
         }else{
-            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
+            throw new BusinessException(EmBusinessError.MISSION_HAS_GONE);
         }
 
 
@@ -71,14 +71,14 @@ public class OrderController extends BaseController {
      *  通过订单编号结束订单
      * @param id
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @PostMapping(value = "/finishMission", consumes = CONTENT_TYPE_FORMED)
-    public CommonReturnType FinishMission(@RequestParam("id") String id ) throws  BuinessException {
+    public CommonReturnType FinishMission(@RequestParam("id") String id ) throws BusinessException {
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
@@ -93,15 +93,15 @@ public class OrderController extends BaseController {
      * @param type 0 我发布的任务 1 我接受的任务
      * @param page
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @GetMapping("/getOrderList")
     public CommonReturnType GetOrderList(@RequestParam("type") Integer type,
-                                         @RequestParam("page") Integer page) throws  BuinessException {
+                                         @RequestParam("page") Integer page) throws BusinessException {
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 

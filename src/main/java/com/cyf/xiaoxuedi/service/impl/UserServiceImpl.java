@@ -4,7 +4,7 @@ import com.cyf.xiaoxuedi.DAO.UserDOMapper;
 import com.cyf.xiaoxuedi.DAO.UserPasswordDOMapper;
 import com.cyf.xiaoxuedi.DO.UserDO;
 import com.cyf.xiaoxuedi.DO.UserPasswordDO;
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.service.UserService;
 import com.cyf.xiaoxuedi.service.model.UserModel;
@@ -39,28 +39,30 @@ public class UserServiceImpl implements UserService {
     RedisTemplate redisTemplate;
 
     @Override
+//    @Transactional(rollbackFor = BusinessException.class)
     @Transactional
-    public void register(UserModel userModel) throws BuinessException {
+    public void register(UserModel userModel) throws BusinessException {
 
         if(userModel==null){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR);
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR);
         }
 
         // 验证传入的注册参数
         ValidationResult validationResult = validator.validate(userModel);
 
         if(validationResult.isHasErrors()){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, validationResult.getErrMsg());
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR, validationResult.getErrMsg());
         }
 
         // 拆分成UserDO和UserPasswordDO
         UserDO userDO =  convertToUserDO(userModel);
 
+
         // 分别进行持久化
         try {
             userDOMapper.insertSelective(userDO);
         } catch (DuplicateKeyException e) {
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"手机号已被注册！");
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"手机号已被注册！");
         }
 
 
@@ -106,24 +108,24 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserModel login(String telephone, String password) throws UnsupportedEncodingException, NoSuchAlgorithmException, BuinessException {
+    public UserModel login(String telephone, String password) throws UnsupportedEncodingException, NoSuchAlgorithmException, BusinessException {
 
         // 获取用户信息
         UserDO userDO = userDOMapper.selectByTelephone(telephone);
 
         if(userDO==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
         }
 
         // 查询对应密码并进行比对
         UserPasswordDO userPasswordDO = userPasswordDOMapper.selectByUserId(userDO.getId());
         UserModel userModel = converToUserModel(userDO, userPasswordDO);
         if(userModel == null){
-            throw new BuinessException(EmBusinessError.USER_LOGIN_FAIL);
+            throw new BusinessException(EmBusinessError.USER_LOGIN_FAIL);
         }
 
         if(!StringUtils.equals(userPasswordDO.getEncrptPassword(), EncrptUtils.encodeByMd5(password))){
-            throw new BuinessException(EmBusinessError.USER_LOGIN_FAIL);
+            throw new BusinessException(EmBusinessError.USER_LOGIN_FAIL);
         }
 
         return userModel;
@@ -136,7 +138,7 @@ public class UserServiceImpl implements UserService {
         if(userDO==null){
             userDO = userDOMapper.selectByPrimaryKey(id);
 //            if(userDO==null){
-//                throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+//                throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
 //            }
             redisTemplate.opsForValue().set("User_"+id, userDO);
             redisTemplate.expire("User_"+id, 30, TimeUnit.MINUTES);

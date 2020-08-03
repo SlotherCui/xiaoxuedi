@@ -2,7 +2,7 @@ package com.cyf.xiaoxuedi.controller;
 
 
 import com.cyf.xiaoxuedi.DO.UserDO;
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.response.CommonReturnType;
 import com.cyf.xiaoxuedi.service.MissionService;
@@ -13,8 +13,6 @@ import com.cyf.xiaoxuedi.service.model.UserModel;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -34,18 +32,18 @@ public class MissionController extends  BaseController{
 
     @PostMapping(value = "/getMissionList",consumes = CONTENT_TYPE_FORMED)
     public CommonReturnType GetMissionList(@RequestParam("school") String school,
-                                           @RequestParam("page") Integer page) throws BuinessException {
+                                           @RequestParam("page") Integer page) throws BusinessException {
 
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
         // 检验入参
         if(StringUtils.isEmpty(school)||page<0){
-            throw  new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR);
+            throw  new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR);
         }
 
         // 跟据学校获取任务列表
@@ -56,18 +54,18 @@ public class MissionController extends  BaseController{
     }
 
 
-    @GetMapping("/publish")
+    @PostMapping(value = "/publish",consumes = CONTENT_TYPE_FORMED)
     public CommonReturnType PublishMission(@RequestParam("title") String title,
                                            @RequestParam("detail") String detail,
                                            @RequestParam("price") BigDecimal price,
                                            @RequestParam("location")String location,
                                            @RequestParam("school") String school
-                                           ) throws BuinessException {
+                                           ) throws BusinessException {
 
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
@@ -96,20 +94,20 @@ public class MissionController extends  BaseController{
      *  获得
      * @param id
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @GetMapping("getMission")
-    public CommonReturnType GetMission(@RequestParam("id") Integer id) throws BuinessException {
+    public CommonReturnType GetMission(@RequestParam("id") Integer id) throws BusinessException {
 
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
         if(id==null){
-            throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
 
@@ -120,11 +118,11 @@ public class MissionController extends  BaseController{
 
     @GetMapping("/getMyMissionList")
     public CommonReturnType GetMyMissionList(@RequestParam("status") Integer status,
-                                             @RequestParam("page") Integer page) throws BuinessException {
+                                             @RequestParam("page") Integer page) throws BusinessException {
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
@@ -137,12 +135,12 @@ public class MissionController extends  BaseController{
 
     @GetMapping("/getMyAcceptedMissionList")
     public CommonReturnType GetMyAcceptedMissionList(@RequestParam("status") Integer status,
-                                             @RequestParam("page") Integer page) throws BuinessException {
+                                             @RequestParam("page") Integer page) throws BusinessException {
 
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 
@@ -153,12 +151,12 @@ public class MissionController extends  BaseController{
 
 
     @GetMapping("/getMyMission")
-    public CommonReturnType GetMyMission(@RequestParam Integer id) throws BuinessException {
+    public CommonReturnType GetMyMission(@RequestParam Integer id) throws BusinessException {
 
         // 获取token
         String [] parameterMap = httpServletRequest.getParameterMap().get("token");
         if(parameterMap==null)
-            throw new BuinessException(EmBusinessError.USER_NOT_LOGIN);
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
         // 验证是否登录并获取UserModel
         UserModel userModel = isLogin(parameterMap[0]);
 

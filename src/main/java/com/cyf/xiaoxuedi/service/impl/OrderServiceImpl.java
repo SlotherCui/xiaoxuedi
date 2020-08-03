@@ -8,12 +8,11 @@ import com.cyf.xiaoxuedi.DO.MissionDO;
 import com.cyf.xiaoxuedi.DO.OrderDO;
 import com.cyf.xiaoxuedi.DO.SequenceDO;
 import com.cyf.xiaoxuedi.DO.UserDO;
-import com.cyf.xiaoxuedi.error.BuinessException;
+import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
 import com.cyf.xiaoxuedi.service.MissionService;
 import com.cyf.xiaoxuedi.service.OrderService;
 import com.cyf.xiaoxuedi.service.UserService;
-import com.cyf.xiaoxuedi.service.model.MissionItemModel;
 import com.cyf.xiaoxuedi.service.model.OrderModel;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,23 +55,23 @@ public class OrderServiceImpl implements OrderService {
      * @param missionId
      * @param userId
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @Override
-    @Transactional
-    public OrderModel acceptMission(Integer missionId, Integer userId) throws BuinessException {
+    @Transactional(rollbackFor = BusinessException.class)
+    public OrderModel acceptMission(Integer missionId, Integer userId) throws BusinessException {
 
         //1. 查询Mission_id 验证是否存在
         //MissionDO missionDO = missionDOMapper.selectByPrimaryKey(missionId);
         // 查缓存
         MissionDO missionDO = missionService.getMissionDOByIdInCache(missionId);
         if(missionDO==null){
-            throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
         // 1.5 判断该任务是否已被抢， 防止当缓存中任务被抢的标志位过期后的更改。
         if(missionDO.getStatus()!=0){
-            throw new BuinessException(EmBusinessError.MISSION_HAS_GONE);
+            throw new BusinessException(EmBusinessError.MISSION_HAS_GONE);
         }
 
 
@@ -81,17 +79,17 @@ public class OrderServiceImpl implements OrderService {
         //2. 查询发起者，接收者 验证是否存在
         UserDO publisher = userService.getUserDOByIdInCache(missionDO.getUserId());
         if(publisher==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
         }
 
         UserDO accepter = userService.getUserDOByIdInCache(userId);
         if(accepter==null){
-            throw new BuinessException(EmBusinessError.USER_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
         }
 
         // 2.5 不能抢自己的任务
         if(publisher.getId()==accepter.getId()){
-            throw new BuinessException(EmBusinessError.MISSION_BY_YOURSELF);
+            throw new BusinessException(EmBusinessError.MISSION_BY_YOURSELF);
         }
 
         //4. 订单入库
@@ -131,38 +129,39 @@ public class OrderServiceImpl implements OrderService {
      * @param missionId
      * @param userId
      * @return
-     * @throws BuinessException
+     * @throws BusinessException
      */
     @Override
-    public OrderModel acceptMissionFaster(Integer missionId, Integer userId) throws BuinessException {
+    public OrderModel acceptMissionFaster(Integer missionId, Integer userId) throws BusinessException {
         return null;
     }
 
 
     @Override
+//    @Transactional(rollbackFor = BusinessException.class)
     @Transactional
-    public void finishOrder(String orderId, Integer userId) throws BuinessException {
+    public void finishOrder(String orderId, Integer userId) throws BusinessException {
         //1. 查询order_id 验证是否存在
         OrderDO orderDO = orderDOMapper.selectByPrimaryKey(orderId);
         if(orderDO==null){
-            throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
         // 1.1 不能结束掉别人的任务
         if(orderDO.getUserId() != userId){
-            throw new BuinessException(EmBusinessError.UNKNOWN_ERROR,"无权访问");
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR,"无权访问");
         }
 
 
         // 1.2 验证任务存在
         MissionDO missionDO = missionService.getMissionDOByIdInCache(orderDO.getMissionId());
         if(missionDO==null){
-            throw new BuinessException(EmBusinessError.MISSION_NOT_EXIT);
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
         }
 
         // 1.3 正在进行中的任务才能结束
         if(orderDO.getStatus()!=0){
-            throw new BuinessException(EmBusinessError.UNKNOWN_ERROR,"已经结束了");
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR,"已经结束了");
         }
 
         // 2. 更改订单状态
@@ -179,7 +178,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<OrderModel> getCurrentOrderList(Integer userId, Integer type, Integer page) throws BuinessException {
+    public List<OrderModel> getCurrentOrderList(Integer userId, Integer type, Integer page) throws BusinessException {
 
         // 获得分页偏移量
         final int pageSize = 10;
@@ -188,7 +187,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 验证入参
         if(page<0){
-            throw new BuinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
+            throw new BusinessException(EmBusinessError.PARAMETER_VALIDATION_ERROR,"页号为负数");
         }
 
         // 分类型查询订单
@@ -198,7 +197,7 @@ public class OrderServiceImpl implements OrderService {
         }else if(type==1){
             list = orderDOMapper.selectByAccepterId(userId, (byte) 0,offset);
         }else{
-            throw new BuinessException(EmBusinessError.UNKNOWN_ERROR,"检索状态异常");
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR,"检索状态异常");
         }
 
 
