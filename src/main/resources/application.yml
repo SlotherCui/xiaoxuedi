@@ -18,3 +18,7 @@ mybatis:
 #    ?characterEncoding=utf-8&useSSL=false
 
 # 配置Spring-boot对Redis的依赖
+mq:
+  nameserver:
+    addr: 127.0.0.1:9876
+  topic: status

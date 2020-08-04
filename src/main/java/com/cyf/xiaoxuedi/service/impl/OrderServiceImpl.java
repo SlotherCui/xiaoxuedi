@@ -10,6 +10,7 @@ import com.cyf.xiaoxuedi.DO.SequenceDO;
 import com.cyf.xiaoxuedi.DO.UserDO;
 import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
+import com.cyf.xiaoxuedi.mq.MqProducer;
 import com.cyf.xiaoxuedi.service.MissionService;
 import com.cyf.xiaoxuedi.service.OrderService;
 import com.cyf.xiaoxuedi.service.UserService;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -50,6 +52,9 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     MissionService missionService;
 
+
+    @Autowired
+    MqProducer mqProducer;
     /**
      * 抢任务的较强一致性方案 // 如果事务执行失败，需要外部try catch还原Redis    // 因为缓存中判断任务是否被抢的标记的过期时间比Mission_更长
      * @param missionId
@@ -120,6 +125,7 @@ public class OrderServiceImpl implements OrderService {
         //6. 删缓存
         redisTemplate.delete("Mission_"+missionId);
 
+
         //7. 返回前端
         return orderModel;
     }
@@ -132,8 +138,78 @@ public class OrderServiceImpl implements OrderService {
      * @throws BusinessException
      */
     @Override
+    @Transactional(rollbackFor = BusinessException.class)
     public OrderModel acceptMissionFaster(Integer missionId, Integer userId) throws BusinessException {
-        return null;
+
+
+        //1. 查询Mission_id 验证是否存在
+        //MissionDO missionDO = missionDOMapper.selectByPrimaryKey(missionId);
+        // 查缓存
+        MissionDO missionDO = missionService.getMissionDOByIdInCache(missionId);
+        if(missionDO==null){
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
+        }
+
+        // 1.5 判断该任务是否已被抢， 防止当缓存中任务被抢的标志位过期后的更改。
+        if(missionDO.getStatus()!=0){
+            throw new BusinessException(EmBusinessError.MISSION_HAS_GONE);
+        }
+
+
+
+        //2. 查询发起者，接收者 验证是否存在
+        UserDO publisher = userService.getUserDOByIdInCache(missionDO.getUserId());
+        if(publisher==null){
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
+        }
+
+        UserDO accepter = userService.getUserDOByIdInCache(userId);
+        if(accepter==null){
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
+        }
+
+        // 2.5 不能抢自己的任务
+        if(publisher.getId()==accepter.getId()){
+            throw new BusinessException(EmBusinessError.MISSION_BY_YOURSELF);
+        }
+
+        //4. 订单入库
+        OrderModel orderModel = new OrderModel();
+        orderModel.setMissionId(missionId);
+        orderModel.setMissionDO(missionDO);
+        orderModel.setOrderPrice(missionDO.getPrice());
+        orderModel.setUserId(publisher.getId());
+        orderModel.setUserDO(publisher);
+        orderModel.setAccepterId(accepter.getId());
+        orderModel.setAccepterDO(accepter);
+        orderModel.setStatus((byte) 0);
+
+        // 生产订单流水号
+        String orderId = generatorOrderId();
+        orderModel.setId(orderId);
+
+        // 入库
+        OrderDO orderDO = new OrderDO();
+        BeanUtils.copyProperties(orderModel, orderDO);
+        orderDOMapper.insertSelective(orderDO);
+
+
+        //5. 异步更新商品信息数据状态
+        missionDO.setStatus((byte) 1);
+        boolean   mqResult =mqProducer.SendChangeMissionStatus(missionDO.getId(),missionDO.getStatus());
+
+
+        // 6. 发送成功更新缓存
+        if(mqResult){
+            redisTemplate.opsForValue().set("Mission_"+missionDO.getId(), missionDO);
+            redisTemplate.expire("Mission_"+missionDO.getId(), 30, TimeUnit.MINUTES);
+        }else{
+            throw new BusinessException(EmBusinessError.UNKNOWN_ERROR,"异步发送消息异常");
+        }
+
+
+        //7. 返回前端
+        return orderModel;
     }
 
 

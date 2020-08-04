@@ -58,5 +58,5 @@ public interface MissionDOMapper {
 
     List<MissionDO> selectMyMissionByStatus(Integer userId, Byte status, Integer offset);
 
-
+    int updateStatusByPrimaryKey(Byte status, Integer id);
 }

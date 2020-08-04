@@ -1,5 +1,6 @@
 package com.cyf.xiaoxuedi.controller;
 
+import com.cyf.xiaoxuedi.DAO.MissionDOMapper;
 import com.cyf.xiaoxuedi.DAO.UserDOMapper;
 import com.cyf.xiaoxuedi.DO.UserDO;
 import com.cyf.xiaoxuedi.error.BusinessException;
@@ -16,12 +17,15 @@ public class TestController extends BaseController{
     @Autowired
     UserDOMapper userDOMapper;
 
+    @Autowired
+    MissionDOMapper missionDOMapper;
+
     @GetMapping("/say")
     public CommonReturnType test(){
-        UserDO userDO = userDOMapper.selectByPrimaryKey(1);
-
-        return userDO==null?CommonReturnType.create("无用户","fail","无用户"):CommonReturnType.create(userDO);
-
+//        UserDO userDO = userDOMapper.selectByPrimaryKey(1);
+        missionDOMapper.updateStatusByPrimaryKey((byte) 1,3);
+//        return userDO==null?CommonReturnType.create("无用户","fail","无用户"):CommonReturnType.create(userDO);
+        return CommonReturnType.create("");
     }
 
     @GetMapping("/testTransactional")
