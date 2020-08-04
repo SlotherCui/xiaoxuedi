@@ -194,7 +194,9 @@ public class OrderServiceImpl implements OrderService {
         orderDOMapper.insertSelective(orderDO);
 
 
+
         //5. 异步更新商品信息数据状态
+        // 时机：在一个事务执行的最后。 当事务提交时。事务性消息
         missionDO.setStatus((byte) 1);
         boolean   mqResult =mqProducer.SendChangeMissionStatus(missionDO.getId(),missionDO.getStatus());
 
@@ -207,12 +209,84 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException(EmBusinessError.UNKNOWN_ERROR,"异步发送消息异常");
         }
 
-
         //7. 返回前端
         return orderModel;
     }
 
+    /**
+     * 抢任务的较保证响应速度的实现方式，采用事务性消息异步更新Mission状态
+     * @param missionId
+     * @param userId
+     * @return
+     * @throws BusinessException
+     */
+    @Override
+    @Transactional(rollbackFor = BusinessException.class)
+    public OrderModel acceptMissionFasterTransactional(Integer missionId, Integer userId) throws BusinessException {
 
+
+        //1. 查询Mission_id 验证是否存在
+        //MissionDO missionDO = missionDOMapper.selectByPrimaryKey(missionId);
+        // 查缓存
+        MissionDO missionDO = missionService.getMissionDOByIdInCache(missionId);
+        if(missionDO==null){
+            throw new BusinessException(EmBusinessError.MISSION_NOT_EXIT);
+        }
+
+        // 1.5 判断该任务是否已被抢， 防止当缓存中任务被抢的标志位过期后的更改。
+        if(missionDO.getStatus()!=0){
+            throw new BusinessException(EmBusinessError.MISSION_HAS_GONE);
+        }
+
+
+
+        //2. 查询发起者，接收者 验证是否存在
+        UserDO publisher = userService.getUserDOByIdInCache(missionDO.getUserId());
+        if(publisher==null){
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
+        }
+
+        UserDO accepter = userService.getUserDOByIdInCache(userId);
+        if(accepter==null){
+            throw new BusinessException(EmBusinessError.USER_NOT_EXIT);
+        }
+
+        // 2.5 不能抢自己的任务
+        if(publisher.getId()==accepter.getId()){
+            throw new BusinessException(EmBusinessError.MISSION_BY_YOURSELF);
+        }
+
+        //4. 订单入库
+        OrderModel orderModel = new OrderModel();
+        orderModel.setMissionId(missionId);
+        orderModel.setMissionDO(missionDO);
+        orderModel.setOrderPrice(missionDO.getPrice());
+        orderModel.setUserId(publisher.getId());
+        orderModel.setUserDO(publisher);
+        orderModel.setAccepterId(accepter.getId());
+        orderModel.setAccepterDO(accepter);
+        orderModel.setStatus((byte) 0);
+
+        // 生产订单流水号
+        String orderId = generatorOrderId();
+        orderModel.setId(orderId);
+
+        // 入库
+        OrderDO orderDO = new OrderDO();
+        BeanUtils.copyProperties(orderModel, orderDO);
+        orderDOMapper.insertSelective(orderDO);
+
+
+
+        // 6. 更新缓存
+
+        redisTemplate.opsForValue().set("Mission_"+missionDO.getId(), missionDO);
+        redisTemplate.expire("Mission_"+missionDO.getId(), 30, TimeUnit.MINUTES);
+
+
+        //7. 返回前端
+        return orderModel;
+    }
     @Override
 //    @Transactional(rollbackFor = BusinessException.class)
     @Transactional

@@ -29,6 +29,7 @@ public class MqConsumer {
     private DefaultMQPushConsumer consumer;
 
 
+
     @Autowired
     MissionDOMapper missionDOMapper;
 

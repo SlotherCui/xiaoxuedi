@@ -2,6 +2,7 @@ package com.cyf.xiaoxuedi.controller;
 
 import com.cyf.xiaoxuedi.error.BusinessException;
 import com.cyf.xiaoxuedi.error.EmBusinessError;
+import com.cyf.xiaoxuedi.mq.MqProducer;
 import com.cyf.xiaoxuedi.response.CommonReturnType;
 import com.cyf.xiaoxuedi.service.OrderService;
 import com.cyf.xiaoxuedi.service.model.OrderModel;
@@ -24,6 +25,9 @@ public class OrderController extends BaseController {
 
     @Autowired
     HttpServletRequest httpServletRequest;
+
+    @Autowired
+    MqProducer mqProducer;
 
     /**
      * 抢任务
@@ -89,6 +93,44 @@ public class OrderController extends BaseController {
 
             try{
                 orderModel = orderService.acceptMissionFaster(id, userModel.getId());
+            }catch (Exception e){
+                // 事务回滚则恢复缓存中的标志
+                redisTemplate.delete("Mission_status_"+id);
+                throw e;
+            }
+
+        }else{
+            throw new BusinessException(EmBusinessError.MISSION_HAS_GONE);
+        }
+
+
+        return CommonReturnType.create(orderModel);
+    }
+
+
+    @PostMapping(value = "/acceptMissionFasterTransactional", consumes = CONTENT_TYPE_FORMED)
+    public CommonReturnType AcceptMissionFasterTransactional(@RequestParam("id") Integer id) throws BusinessException {
+        // 获取token
+        String [] parameterMap = httpServletRequest.getParameterMap().get("token");
+        if(parameterMap==null)
+            throw new BusinessException(EmBusinessError.USER_NOT_LOGIN);
+        // 验证是否登录并获取UserModel
+        UserModel userModel = isLogin(parameterMap[0]);
+
+
+        OrderModel orderModel = null;
+
+
+        // 如果执行失败则执行方法
+        // 0. 在缓存中判断该任务是否被抢
+        Boolean missionStatus = redisTemplate.opsForValue().setIfAbsent("Mission_status_"+id, 1, 1, TimeUnit.DAYS);
+
+        if(missionStatus){
+
+            try{
+                if(!mqProducer.TransactionSendChangeMissionStatus(id, (byte) 1, userModel.getId())){
+                    throw new BusinessException(EmBusinessError.UNKNOWN_ERROR,"抢单失败");
+                }
             }catch (Exception e){
                 // 事务回滚则恢复缓存中的标志
                 redisTemplate.delete("Mission_status_"+id);
